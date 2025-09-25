@@ -7,13 +7,13 @@ class TrainOptions():
     
     def initialize(self,parser):
         parser.add_argument('--dataset', default="datset")
-        parser.add_argument('--network', default="ViT2Channels")
-        parser.add_argument('--loader', default="createByDir")
+        parser.add_argument('--network', default="Res18_2Channels")
+        parser.add_argument('--loader', default="gen_image")
         parser.add_argument('--epochs', type=int, default=30)
-        parser.add_argument('--lr', type=float, default=1e-4)
-        parser.add_argument('--dataroot', type=str, default="previous studies/CNNDetection/dataset")
+        parser.add_argument('--lr', type=float, default=1e-5)
+        parser.add_argument('--dataroot', type=str, default="dataset/GenImage/sd4")
         parser.add_argument('--batch_size', type=int, default="64")
-        parser.add_argument('--transform', default="hog_256")
+        parser.add_argument('--transform', default="hogfft_256")
         self.initialized = True
         return parser
     

@@ -43,3 +43,15 @@ def trainSplit(dataroot, batch_size, transform=None):
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=12)
     
     return train_loader, val_loader
+
+def gen_image(dataroot, batch_size, transform=None):
+    train_dir = f'{dataroot}/train'
+    val_dir = f'{dataroot}/val'
+    
+    train_dataset = genImage(root_dir=train_dir, transform=transform)
+    val_dataset = genImage(root_dir=val_dir, transform=transform)
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=12)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=12)
+    
+    return train_loader, val_loader

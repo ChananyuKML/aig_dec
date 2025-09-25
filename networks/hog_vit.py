@@ -51,7 +51,7 @@ class CustomDecoder(nn.Module):
 
 
 
-class ViT2Channels(nn.Module):
+class DualViT(nn.Module):
     def __init__(self, img_size=224, patch_size=16, in_channels=1, num_classes=2,
                  emb_dim=768, depth=6, heads=8, mlp_dim=512, dropout=0.1):
         super().__init__()

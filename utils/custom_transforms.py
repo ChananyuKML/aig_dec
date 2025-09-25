@@ -61,7 +61,8 @@ class HogTransformScaled(object):
         ],dtype=torch.float32).reshape(1, 1, 3, 3)
 
     def normalize(self, x):
-        return (x-torch.min(x))/(torch.max(x)-torch.min(x))
+        denominator = torch.max(x) - torch.min(x)
+        return (x - torch.min(x)) / (denominator + 1e-8)
     
     def __call__(self, object):
         assert isinstance(object, torch.Tensor)
@@ -158,7 +159,9 @@ class Hog2Hist(object):
     
         concatenated = torch.concatenate((mag_norm_hist, dir_norm_hist), dim=0)
         return concatenated.unsqueeze(0)
-    
+
+
+
 hog_hist = transforms.Compose([
         transforms.Grayscale(),
         transforms.Resize((256, 256)),
@@ -183,21 +186,32 @@ hog_256 = transforms.Compose([
 
 hog_224 = transforms.Compose([
         transforms.Grayscale(),
-        transforms.Resize((224, 224)),
+        transforms.RandomResizedCrop(224),
+        transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         HogTransformScaled(),
     ])
 
 hogfft_224 = transforms.Compose([
         transforms.Grayscale(),
-        transforms.Resize((224, 224)),
+        transforms.RandomResizedCrop(224),
+        transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         HogFFT()
     ])
 
 hogfft_256 = transforms.Compose([
         transforms.Grayscale(),
-        transforms.Resize((256, 256)),
+        transforms.RandomResizedCrop(256),
+        transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         HogFFT()
+    ])
+
+rgb_224 = transforms.Compose([
+        transforms.RandomResizedCrop(224),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], 
+                            std=[0.229, 0.224, 0.225])
     ])

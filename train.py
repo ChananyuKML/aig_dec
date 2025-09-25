@@ -1,23 +1,33 @@
 import torch.optim as optim
 import torch
+import torch.nn as nn
 import argparse
 from utils import train_opt, create_dataloader, custom_transforms, create_dataset
 from networks.hog_vit import *
 from networks.hog_resnet import *
 from networks.hog_cnn import *
+from networks.rgb_resnet import *
 import os
 import matplotlib.pyplot as plt
 import pathlib
 
+torch.autograd.set_detect_anomaly(True)
 
 def train_model(model,model_name, transform, train_loader, valid_loader, num_epochs=30, lr=1e-4, device="cuda"):
     model.to(device)
     out_path = f'checkpoints/{model_name}_{transform}_norm'
+    print(lr)
+    if os.path.exists(out_path):
+        print("Path Exits")
+        pass
+    else:
+        os.mkdir(out_path)
     path = pathlib.Path(out_path)
     train_loss_hist = []
     val_loss_hist = []
     criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
+    best_val_loss = float('inf')
     if path.exists() and path.is_dir():
         print("Directory exists:", path)
     else:
@@ -25,7 +35,6 @@ def train_model(model,model_name, transform, train_loader, valid_loader, num_epo
     for epoch in range(num_epochs):
         model.train()
         train_loss = 0
-        best_val_loss = float('inf')
         correct = 0
         iter = 1
 
@@ -37,7 +46,7 @@ def train_model(model,model_name, transform, train_loader, valid_loader, num_epo
             loss.backward()
             optimizer.step()
 
-            pred = (outputs > 0.5).float()
+            pred = (torch.sigmoid(outputs) > 0.5).float()
             train_loss += loss.item() * data.size(0)
             correct += (pred  == labels).sum().item()
             if iter%10==1:
@@ -58,7 +67,7 @@ def train_model(model,model_name, transform, train_loader, valid_loader, num_epo
                 outputs = model(inputs)
                 loss = criterion(outputs, labels)
                 
-                val_loss += loss.item() * data.size(0)
+                val_loss += loss.item() * inputs.size(0)
                 pred = (outputs > 0.5).float()
                 val_correct += (pred == labels).sum().item()
 
@@ -76,17 +85,20 @@ def train_model(model,model_name, transform, train_loader, valid_loader, num_epo
     return train_loss_hist, val_loss_hist
 
 if __name__ == '__main__':
+
     device = "cuda" if torch.cuda.is_available else 'cpu'
 
     opt = train_opt.TrainOptions().parse()
 
     match opt.network:
-        case "ViT2Channels":
-            model = ViT2Ch()
+        case "res18_rgb":
+            model = Resnet18()
+        case "dual_vit":
+            model = DualViT()
         case "dual_cnn":
             model = DualCNN()
-        case "Res18_2Channels":
-            model = Resnet()
+        case "res18_2ch":
+            model = Resnet18_2CH()
         case "HogHistTrans":
             model = HogHistTransformer()
         case "pretrain_vit":
@@ -109,6 +121,8 @@ if __name__ == '__main__':
             transform = custom_transforms.hog_hist
         case "hog_hist_8D":
             transform = custom_transforms.hog_hist_8D
+        case "rgb_224":
+            transform = custom_transforms.rgb_224
         case "_":
             print("Unknown Loader")
 
@@ -117,6 +131,8 @@ if __name__ == '__main__':
             train_loader, val_loader, _ = create_dataloader.createByDir(opt.dataroot, opt.batch_size, transform=transform)
         case "createByDir2":
             train_loader, val_loader = create_dataloader.createByDir2(opt.dataroot, opt.batch_size, transform=transform)
+        case "gen_image":
+            train_loader, val_loader = create_dataloader.gen_image(opt.dataroot, opt.batch_size, transform=transform)
         case "_":
             print("Unknown Loader")
 

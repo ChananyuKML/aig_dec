@@ -72,3 +72,39 @@ class CNNDetectionataset2(Dataset):
             image = self.transform(image)
 
         return image, label
+
+
+class genImage(Dataset):
+    def __init__(self, root_dir, transform=None):
+        self.data = []
+        self.transform = transform
+        self.label_map = {"nature": 0, "ai": 1}
+        
+        # Iterate through the label directories ('nature', 'ai')
+        for label_name in self.label_map.keys():
+            class_path = os.path.join(root_dir, label_name)
+
+            if not os.path.isdir(class_path):
+                continue
+
+            # Get the correct label index
+            label_index = self.label_map[label_name]
+
+            # Add each file in the directory with its correct label
+            for file_name in os.listdir(class_path):
+                file_path = os.path.join(class_path, file_name)
+                if file_name.lower().endswith((".png", ".jpg", ".jpeg")):
+                    self.data.append((file_path, label_index))
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        # print(len(self.data))
+        img_path, label = self.data[idx]
+        image = Image.open(img_path).convert("RGB")
+
+        if self.transform:
+            image = self.transform(image)
+
+        return image, label

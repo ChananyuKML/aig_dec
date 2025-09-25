@@ -4,26 +4,8 @@ import torch.nn as nn
 from torchvision import models
 
 
-class CustomFeedForward(nn.Module):
-    def __init__(self, input_dim):
-        super(CustomFeedForward, self).__init__()
-        self.ff = nn.Sequential(
-            nn.Linear(512, 256),
-            nn.LeakyReLU(0.2), 
-            nn.Linear(256, 128),
-            nn.LeakyReLU(0.2),
-            nn.Linear(128, 64),
-            nn.LeakyReLU(0.2),
-            nn.Linear(64, 32),
-            nn.LeakyReLU(0.2),
-            nn.Linear(32, 1),
-            nn.Sigmoid()
-        )
 
-    def forward(self, x):
-        return self.ff(x)
-
-class Resnet(nn.Module):
+class Resnet18_2CH(nn.Module):
     def __init__(self):
         super().__init__()
         resnet = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
@@ -55,7 +37,7 @@ class Resnet(nn.Module):
 
         # Replace fc layer
         num_ftrs = resnet.fc.in_features
-        resnet.fc = CustomFeedForward(input_dim=num_ftrs)
+        resnet.fc = nn.Linear(num_ftrs, 1)
         self.model = resnet
 
     def forward(self, x):
