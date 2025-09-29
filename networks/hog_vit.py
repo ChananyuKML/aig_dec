@@ -48,7 +48,38 @@ class CustomDecoder(nn.Module):
         x = x + self.attn(self.norm1(x), self.norm1(x), self.norm1(x))[0]
         return self.norm2(x)
 
+class ViT2CH(nn.Module):
+    def __init__(self, img_size=224, patch_size=16, in_channels=2, num_classes=1,
+                 emb_dim=768, depth=6, heads=8, mlp_dim=512, dropout=0.1):
+        super().__init__()
 
+        self.patch_embed = PatchEmbedding(in_channels, patch_size, emb_dim, img_size)
+        self.num_patches = (img_size // patch_size) ** 2
+        self.cls_token = nn.Parameter(torch.randn(1, 1, emb_dim))
+        self.pos_embed = nn.Parameter(torch.randn(1, self.num_patches, emb_dim))
+        self.dropout = nn.Dropout(dropout)
+        self.encoder = nn.Sequential(*[
+            TransformerEncoder(emb_dim, heads, mlp_dim, dropout) for _ in range(depth)
+        ])
+
+        self.pooling = nn.Sequential(nn.Conv1d(in_channels=emb_dim, out_channels=mlp_dim, kernel_size=3, padding=1),
+                                     nn.GELU(),
+                                     nn.AdaptiveAvgPool1d(1))
+        self.mlp_head = nn.Sequential(
+            nn.Linear(mlp_dim, mlp_dim//2),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(mlp_dim//2, num_classes)
+        )
+
+    def forward(self, x):
+        x = self.patch_embed(x)  # [B, num_patches, emb_dim] 
+        x = x + self.pos_embed
+        x = self.dropout(x)
+        x = self.encoder(x)
+        x = rearrange(x, 'b l d -> b d l')
+        x_pooled = self.pooling(x).squeeze(-1)
+        return self.mlp_head(x_pooled)
 
 
 class DualViT(nn.Module):
@@ -75,9 +106,10 @@ class DualViT(nn.Module):
 
        
         self.mlp_head = nn.Sequential(
-            nn.LayerNorm(emb_dim),
-            nn.Linear(emb_dim, 1),
-            nn.Sigmoid()
+            nn.Linear(emb_dim, mlp_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(mlp_dim, 1)
         )
 
         self.depth = depth
@@ -169,7 +201,7 @@ class DualViT(nn.Module):
         
         x = self.s_attn2(x)
         x = self.norm12(x + self.c_attn2(y, x, x)[0])
-        x = self.norm22(x + self.mlp1(x))
+        x = self.norm22(x + self.mlp2(x))
 
         x = self.s_attn3(x)
         x = self.norm13(x + self.c_attn3(y, x, x)[0])
@@ -209,47 +241,6 @@ class DualViT(nn.Module):
         cls_output = x2[:, 0]  # CLS token
         return self.mlp_head(cls_output)
 
-class HogHistTransformer(nn.Module):
-    def __init__(self, input_len=512, input_dim=1, mlp_dim=512,
-                 emb_dim=768, depth=6, heads=8, dropout=0.1):
-        super().__init__()
-        self.token_emb = nn.Linear(input_dim, emb_dim)
-
-        pos_emb = torch.zeros(input_len, emb_dim)
-        position = torch.arange(0, input_len, dtype=torch.float).unsqueeze(1)  # (seq_len, 1)
-        div_term = torch.exp(torch.arange(0, emb_dim, 2).float() * (-math.log(10000.0) / emb_dim))
-        pos_emb[:, 0::2] = torch.sin(position * div_term)
-        pos_emb[:, 1::2] = torch.cos(position * div_term)
-        self.pos_emb = pos_emb.to("cuda")
-
-        self.dropout = nn.Dropout(dropout)
-
-        self.transformer = nn.Sequential(*[
-            TransformerEncoder(emb_dim, heads, mlp_dim, dropout) for _ in range(depth)
-        ])
-
-        self.pooling = nn.Linear(emb_dim, 1)
-
-        self.mlp_head = nn.Sequential(
-            nn.LayerNorm(mlp_dim),
-            nn.Linear(mlp_dim, mlp_dim//2),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(mlp_dim//2, 1),
-            nn.Sigmoid()
-        )
-
-    def pos_embedding(self, x):
-        return self.pos_emb + x
-    
-    def forward(self, x):
-        x = rearrange(x, 'b d l -> b l d')
-        x = self.token_emb(x)
-        x = self.pos_embedding(x)
-        x = self.dropout(x)
-        x = self.transformer(x)
-        x = self.pooling(x).squeeze(-1)
-        return self.mlp_head(x)
     
 
 class HogHist8D(nn.Module):
@@ -280,8 +271,7 @@ class HogHist8D(nn.Module):
             nn.Linear(mlp_dim, mlp_dim//2),
             nn.GELU(),
             nn.Dropout(dropout),
-            nn.Linear(mlp_dim//2, 1),
-            nn.Sigmoid()
+            nn.Linear(mlp_dim//2, 1)
         )
 
     def pos_embedding(self, x):
@@ -319,8 +309,7 @@ class HogHist8D_Convo(nn.Module):
 
         self.mlp_head = nn.Sequential(
             nn.LayerNorm(emb_dim),
-            nn.Linear(emb_dim, 1),
-            nn.Sigmoid()
+            nn.Linear(emb_dim, 1)
         )
 
     def pos_embedding(self, x):
@@ -369,8 +358,6 @@ class ViT2Ch(nn.Module):
             nn.GELU(),
             nn.Dropout(dropout),
             nn.Linear(mlp_dim//2, 1),
-            nn.GELU(),
-            nn.Sigmoid()
         )
 
     
@@ -384,20 +371,39 @@ class ViT2Ch(nn.Module):
         return self.mlp_head(x)
 
 class PretrainViT(nn.Module):
-    def __init__(self, vit_model_name='vit_base_patch16_224', num_classes=2, emb_dim=768, depth=6, heads=8, dropout=0.1):
+    def __init__(self, vit_model_name='vit_base_patch16_224', num_classes=1, emb_dim=768, depth=6, heads=8, dropout=0.1):
         super().__init__()
 
         self.vit = timm.create_model(vit_model_name, pretrained=True, num_classes=num_classes)
 
-        self.vit.patch_embed.proj = nn.Conv2d(2, emb_dim,
-                                                  kernel_size=self.vit.patch_embed.proj.kernel_size,
-                                                  stride=self.vit.patch_embed.proj.stride)
-        self.cls = nn.Sequential(
-            nn.LayerNorm(2),
-            nn.Linear(2, 1),
-            nn.GELU(),
-            nn.Sigmoid()
+        original_layer = model.patch_embed.proj
+        original_weights = original_layer.weight
+		
+        new_layer = nn.Conv2d(
+        in_channels=2,
+        out_channels=original_layer.out_channels,
+        kernel_size=original_layer.kernel_size,
+        stride=original_layer.stride,
+        padding=original_layer.padding)
+
+        if pretrained:
+            with torch.no_grad():
+                # Average the weights of the first two channels (R and G)
+                new_layer.weight.data = original_weights.data[:, :2, :, :].mean(dim=1, keepdim=True)
+                # You might want to copy the bias term if it exists
+                if original_layer.bias is not None:
+                    new_layer.bias.data = original_layer.bias.data        
+        
+        self.vit.patch_embed.proj = new_layer
+
+        num_ftrs = model.head.in_features
+
+        self.mlp_head = nn.Sequential(
+            nn.Linear(num_ftrs, num_filters//2),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(num_filters//2, num_classes)
         )
 
     def forward(self, x):
-        return self.cls(self.vit(x))
+        return self.mlp_head(self.vit(x))

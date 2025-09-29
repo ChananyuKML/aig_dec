@@ -42,10 +42,8 @@ class DualCNN(nn.Module):
         self.classifier = nn.Sequential(
             nn.Linear(combined_dim, mlp_dim),
             nn.ReLU(),
-            nn.Dropout(0.1),
             nn.Linear(mlp_dim, mlp_dim//2),
             nn.ReLU(),
-            nn.Dropout(0.1),
             nn.Linear(mlp_dim//2, 1)
         )
 
