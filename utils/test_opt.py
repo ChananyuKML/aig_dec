@@ -6,14 +6,13 @@ class TestOptions():
         self.initialized = False
     
     def initialize(self,parser):
-        parser.add_argument('--dataset', default="datset")
-        parser.add_argument('--network', default="ViT2Channels")
-        parser.add_argument('--loader', default="createByDir")
-        parser.add_argument('--epochs', type=int, default=30)
-        parser.add_argument('--lr', type=float, default=1e-4)
-        parser.add_argument('--dataroot', type=str, default="previous studies/CNNDetection/dataset")
-        parser.add_argument('--batch_size', type=int, default="64")
-        parser.add_argument('--transform', default="hog_256")
+        parser.add_argument('--generator', default="sd4")
+        parser.add_argument('--network', default="dual_cnn")
+        parser.add_argument('--loader', default="gen_image")
+        parser.add_argument('--batch_size', default=64)
+        parser.add_argument('--checkpoint', default="100")
+        parser.add_argument('--dataroot', type=str, default="dataset/genimage")
+        parser.add_argument('--transform', default="hog_224")
         self.initialized = True
         return parser
     

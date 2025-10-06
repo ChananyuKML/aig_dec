@@ -192,6 +192,16 @@ hog_224 = transforms.Compose([
         HogTransformScaled(),
     ])
 
+
+hog_224_vit = transforms.Compose([
+        transforms.Grayscale(),
+        transforms.RandomResizedCrop(224),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        HogTransformScaled(),
+        transforms.Normalize([0.5, 0.5], [0.5,0.5])
+    ])
+
 hogfft_224 = transforms.Compose([
         transforms.Grayscale(),
         transforms.RandomResizedCrop(224),

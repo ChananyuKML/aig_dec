@@ -34,7 +34,7 @@ class TransformerEncoder(nn.Module):
     def forward(self, x):
         x = x + self.attn(self.norm1(x), self.norm1(x), self.norm1(x))[0]
         x = x + self.mlp(self.norm2(x))
-        return self.norm3(x)
+        return x
 
 
 class CustomDecoder(nn.Module):
@@ -48,6 +48,31 @@ class CustomDecoder(nn.Module):
         x = x + self.attn(self.norm1(x), self.norm1(x), self.norm1(x))[0]
         return self.norm2(x)
 
+class SinusoidalPositionalEmbedding(nn.Module):
+    def __init__(self, d_model, max_seq_len=2048):
+        super(SinusoidalPositionalEmbedding, self).__init__()
+        
+        # Create a positional encoding matrix of shape (max_seq_len, d_model)
+        pe = torch.zeros(max_seq_len, d_model)
+        
+        # Create a tensor for positions
+        position = torch.arange(0, max_seq_len, dtype=torch.float).unsqueeze(1)
+        
+        # Calculate the division term for the denominator
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-torch.log(torch.tensor(10000.0)) / d_model))
+        
+        # Apply sine to even indices and cosine to odd indices
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        
+        # Register the positional embedding matrix as a buffer
+        # A buffer is a tensor that is not a parameter but should be part of the model's state_dict
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        # Add the positional embeddings to the input tensor
+        return x + self.pe[:x.size(1), :].unsqueeze(0)
+
 class ViT2CH(nn.Module):
     def __init__(self, img_size=224, patch_size=16, in_channels=2, num_classes=1,
                  emb_dim=768, depth=6, heads=8, mlp_dim=512, dropout=0.1):
@@ -56,34 +81,118 @@ class ViT2CH(nn.Module):
         self.patch_embed = PatchEmbedding(in_channels, patch_size, emb_dim, img_size)
         self.num_patches = (img_size // patch_size) ** 2
         self.cls_token = nn.Parameter(torch.randn(1, 1, emb_dim))
-        self.pos_embed = nn.Parameter(torch.randn(1, self.num_patches, emb_dim))
+        self.pos_embed = SinusoidalPositionalEmbedding(d_model = emb_dim)
         self.dropout = nn.Dropout(dropout)
         self.encoder = nn.Sequential(*[
             TransformerEncoder(emb_dim, heads, mlp_dim, dropout) for _ in range(depth)
         ])
 
-        self.pooling = nn.Sequential(nn.Conv1d(in_channels=emb_dim, out_channels=mlp_dim, kernel_size=3, padding=1),
-                                     nn.GELU(),
-                                     nn.AdaptiveAvgPool1d(1))
+        self.norm = nn.LayerNorm(emb_dim)
+
         self.mlp_head = nn.Sequential(
+            nn.Linear(emb_dim, mlp_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
             nn.Linear(mlp_dim, mlp_dim//2),
             nn.GELU(),
             nn.Dropout(dropout),
             nn.Linear(mlp_dim//2, num_classes)
-        )
+            )
 
     def forward(self, x):
+        B, _, _, _ = x.shape
         x = self.patch_embed(x)  # [B, num_patches, emb_dim] 
-        x = x + self.pos_embed
+        cls_token = self.cls_token.expand(B, -1, -1)
+        x = torch.cat([cls_token, x], dim=1) # [B, num_patches + 1, emb_dim]
+        x = self.pos_embed(x)
         x = self.dropout(x)
         x = self.encoder(x)
-        x = rearrange(x, 'b l d -> b d l')
-        x_pooled = self.pooling(x).squeeze(-1)
-        return self.mlp_head(x_pooled)
+        x = self.norm(x)
+        cls_output = x[:, 0]
+        return self.mlp_head(cls_output)
+
+
+
+
+class DualViTv2(nn.Module):
+    def __init__(self, img_size=224, patch_size=16, in_channels=1, num_classes=1,
+                 emb_dim=768, depth=6, heads=8, mlp_dim=512, dropout=0.1):
+        super().__init__()
+
+        self.patch_embed_1 = PatchEmbedding(in_channels, patch_size, emb_dim, img_size)
+        self.patch_embed_2 = PatchEmbedding(in_channels, patch_size, emb_dim, img_size)
+
+        self.num_patches = (img_size // patch_size) ** 2
+
+        self.cls_token_1 = nn.Parameter(torch.randn(1, 1, emb_dim))
+        self.cls_token_2 = nn.Parameter(torch.randn(1, 1, emb_dim))
+
+        self.pos_embed_1 = SinusoidalPositionalEmbedding(d_model = emb_dim)
+        self.pos_embed_2 = SinusoidalPositionalEmbedding(d_model = emb_dim)
+
+        self.dropout = nn.Dropout(dropout)
+
+        self.encoder_1 = nn.Sequential(*[
+            TransformerEncoder(emb_dim, heads, mlp_dim, dropout) for _ in range(depth)
+        ])
+
+        self.encoder_2 = nn.Sequential(*[
+            TransformerEncoder(emb_dim, heads, mlp_dim, dropout) for _ in range(depth)
+        ])
+
+        self.crs_attn = nn.MultiheadAttention(emb_dim, heads, batch_first=True)
+
+
+        self.mlp_head = nn.Sequential(
+            nn.Linear(emb_dim, mlp_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(mlp_dim, mlp_dim//2),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(mlp_dim//2, num_classes)
+            )
+
+    def forward(self, x):
+
+        B, _, _, _ = x.shape
+
+        x1 = x[:, 0:1, :, :]
+        x2 = x[:, 1:2, :, :]
+
+        x1 = self.patch_embed_1(x1)  # [B, num_patches, emb_dim]
+        x2 = self.patch_embed_2(x2)
+
+        cls_tokens_1 = self.cls_token_1.expand(B, -1, -1)  # [B, 1, emb_dim]
+        cls_tokens_2 = self.cls_token_2.expand(B, -1, -1)
+
+        x1 = torch.cat((cls_tokens_1, x1), dim=1)  # [B, num_patches + 1, emb_dim]
+        x2 = torch.cat((cls_tokens_2, x2), dim=1) 
+
+        x1 = self.pos_embed_1(x1)
+        x2 = self.pos_embed_2(x2)
+
+        x1 = self.encoder_1(x1)
+        x2 = self.encoder_2(x2)
+
+        fused, _ = self.crs_attn(
+            query=x1, 
+            key=x2, 
+            value=x2
+        )
+
+        cls_output = fused[:, 0]  # CLS token
+
+        return self.mlp_head(cls_output)
+
+
+
+
+
 
 
 class DualViT(nn.Module):
-    def __init__(self, img_size=224, patch_size=16, in_channels=1, num_classes=2,
+    def __init__(self, img_size=224, patch_size=16, in_channels=1, num_classes=1,
                  emb_dim=768, depth=6, heads=8, mlp_dim=512, dropout=0.1):
         super().__init__()
 
@@ -104,13 +213,17 @@ class DualViT(nn.Module):
             TransformerEncoder(emb_dim, heads, mlp_dim, dropout) for _ in range(depth)
         ])
 
-       
+
         self.mlp_head = nn.Sequential(
             nn.Linear(emb_dim, mlp_dim),
             nn.GELU(),
             nn.Dropout(dropout),
-            nn.Linear(mlp_dim, 1)
-        )
+            nn.Linear(mlp_dim, mlp_dim//2),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(mlp_dim//2, num_classes)
+            )
+     
 
         self.depth = depth
         self.s_attn1 = CustomDecoder(emb_dim, heads, dropout=dropout)

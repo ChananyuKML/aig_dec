@@ -30,7 +30,7 @@ def train_model(model,model_name, transform, train_loader, valid_loader, num_epo
 	train_loss_hist = []
 	val_loss_hist = []
 	criterion = nn.BCEWithLogitsLoss()
-	optimizer = optim.Adam(model.parameters(), lr=lr)
+	optimizer = optim.AdamW(model.parameters(), lr=lr)
 	best_val_loss = float('inf')
 	if path.exists() and path.is_dir():
 		print("Directory exists:", path)
@@ -48,6 +48,7 @@ def train_model(model,model_name, transform, train_loader, valid_loader, num_epo
 			outputs = model(data)
 			loss = criterion(outputs, labels)
 			loss.backward()
+			nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
 			optimizer.step()
 			pred = (torch.sigmoid(outputs) > 0.5).float()
 			train_loss += loss.item() * data.size(0)
@@ -77,7 +78,7 @@ def train_model(model,model_name, transform, train_loader, valid_loader, num_epo
 			print(f"Epoch {epoch+1}/{num_epochs}, Validation Loss: {val_loss:.4f}, Val Accuracy: {val_acc:.4f}")
     
 			if val_loss < best_val_loss:
-				best_val_loss = val_loss + train_loss
+				best_val_loss = val_loss
 				torch.save(model.state_dict(), f'{out_path}/ckpt_{epoch+1}.pth')
 				print(f"✅ Saved new best model at epoch {epoch+1} with val loss {val_loss:.4f}")
 			train_loss_hist.append(train_loss)
@@ -94,7 +95,7 @@ if __name__ == '__main__':
         case "res18_rgb":
             model = Resnet18()
         case "dual_vit":
-            model = DualViT()
+            model = DualViTv2()
         case "dual_cnn":
             model = DualCNN()
         case "res18_2ch":
@@ -111,6 +112,8 @@ if __name__ == '__main__':
     match opt.transform:
         case "hog_224":
             transform = custom_transforms.hog_224
+        case "hog_224_vit":
+            transform = custom_transforms.hog_224_vit
         case "hogfft_224":
             transform = custom_transforms.hogfft_224
         case "hogfft_256":
