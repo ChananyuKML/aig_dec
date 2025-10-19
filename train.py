@@ -4,9 +4,8 @@ import torch.nn as nn
 import argparse
 from utils import train_opt, create_dataloader, custom_transforms, create_dataset
 from networks.hog_vit import *
-from networks.hog_resnet import *
+from networks.resnet import *
 from networks.hog_cnn import *
-from networks.rgb_resnet import *
 import os
 import matplotlib.pyplot as plt
 import pathlib
