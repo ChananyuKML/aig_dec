@@ -3,12 +3,11 @@ import torch
 import torch.nn as nn
 from torchvision import models
 
-
-
 class Resnet18_2CH(nn.Module):
     def __init__(self):
         super().__init__()
-        resnet = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
+        resnet = models.resnet18(weights=None)
+        model.load_state_dict(torch.load("checkpoints/pretrained/resnet18.pth"))
         old_conv = resnet.conv1
         resnet.conv1 = nn.Conv2d(
             in_channels=2,  # Change from 3 to 2
@@ -46,9 +45,8 @@ class Resnet18_2CH(nn.Module):
 class Resnet18(nn.Module):
     def __init__(self):
         super().__init__()
-        resnet = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
-        
-
+        resnet = models.resnet18(weights=None)
+        model.load_state_dict(torch.load("checkpoints/pretrained/resnet18.pth"))
         # === FREEZE ALL PARAMETERS FIRST ===
         for param in resnet.parameters():
             param.requires_grad = False
