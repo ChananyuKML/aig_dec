@@ -3,3 +3,4 @@ dataset
 checkpoints
 code
 *__pycache__*
+*.out

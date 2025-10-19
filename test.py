@@ -15,8 +15,8 @@ from PIL import Image
 
 def test_model(model, network, checkpoint, transform, test_dataset, batch_size=256, device="cuda"):
     model.to(device)
-    print(f'loading ckpt from :checkpoints/{network}_{opt.transform}_norm_100/ckpt_{checkpoint}.pth')
-    state_dict = torch.load(f'checkpoints/{network}_{opt.transform}_norm_100/ckpt_{checkpoint}.pth', weights_only=True)
+    print(f'loading ckpt from :checkpoints/{network}_{opt.transform}_norm_300/ckpt_{checkpoint}.pth')
+    state_dict = torch.load(f'checkpoints/{network}_{opt.transform}_norm_300/ckpt_{checkpoint}.pth', weights_only=True)
     # --- 3. Create a new state_dict without the 'module.' prefix ---
     new_state_dict = {}
     for k, v in state_dict.items():

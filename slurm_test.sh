@@ -9,5 +9,11 @@
 
 module load Mamba/23.11.0-0         # Load the conda module
 conda activate pytorch-2.2.2
-
-python test.py --network dual_cnn --transform hogfft_224 --loader gen_image --generator vqdm --checkpoint 100
+generators=("adm" "midjourney" "wukong")
+for gen in "${generators[@]}"
+do
+	echo "Starting test for generator: $gen"
+	python test.py --network dual_cnn --transform hog_224 --loader gen_image --generator "$gen" --checkpoint 300
+	echo "Finished test for generator: $gen"
+	echo "-----------------------------------"
+done
