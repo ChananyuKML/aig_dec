@@ -10,4 +10,4 @@
 module load Mamba/23.11.0-0         # Load the conda module
 conda activate pytorch-2.2.2
 
-python train.py --network dual_cnn --transform hogfft_224 --epochs 300 --lr 1e-4
+python train.py --network res18_rgb --transform rgb_224 --epochs 100 --lr 1e-4
