@@ -11,6 +11,7 @@
 |    Spec   |    52.0    |   99.4  |   99.2  | 49.7 |  49.8 |  94.8  | 55.6 |  49.8  |     68.8    |
 |   F3Net   |    50.1    |   99.9  |   99.9  | 49.9 |  50.0 |  99.9  | 49.9 |  49.9  |     68.7    |
 |  GramNet  |    54.2    |   99.2  |   99.1  | 50.3 |  54.6 |  98.9  | 50.8 |  51.7  |     69.9    |
+|  HoG  |    54.2    |   99.2  |   99.1  | 50.3 |  54.6 |  98.9  | 50.8 |  51.7  |     69.9    |
 
 - Table 4: Results of cross-validation on different training and test subsets using different methods. Eight models trained on eight generators are tested on one generator, and their average accuracy is each data point in the testing subset column.
 
@@ -22,6 +23,7 @@
 |  CNNSpot  |    58.2    |   70.3  |   70.2  | 57.0 |  57.1 |  67.7  | 56.7 |  56.6  |     61.7    |
 |    Spec   |    56.7    |   72.4  |   72.3  | 57.9 |  65.4 |  70.3  | 61.7 |  64.3  |     65.1    |
 |   F3Net   |    55.1    |   73.1  |   73.1  | 66.5 |  57.8 |  72.3  | 62.1 |  56.5  |     64.6    |
+|  GramNet  |    58.1    |   72.8  |   72.7  | 58.7 |  65.3 |  71.3  | 57.8 |  61.2  |     64.7    |
 |  GramNet  |    58.1    |   72.8  |   72.7  | 58.7 |  65.3 |  71.3  | 57.8 |  61.2  |     64.7    |
 
 - Table 5: Model evaluation on degraded images. q denotes quality.
@@ -35,3 +37,4 @@
 |    Spec   |   50.0     | 49.9    |  50.8   | 50.4  | 49.9  | 49.9  | 50.1 |   
 |   F3Net   |    50.0    | 50.0    | 89.0    | 74.4 | 57.9  |  51.7 | 62.1 |   
 |  GramNet  |    98.8    |  94.9   | 68.8    | 53.4 | 95.9  | 81.6  | 82.2 |  
+|  GramNet  |    98.8    |  94.9   | 68.8    | 53.4 | 95.9  | 81.6  | 82.2 | 
